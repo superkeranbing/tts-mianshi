@@ -25,3 +25,13 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Ensure default user exists (needed for FK constraints with PostgreSQL)
+    db = SessionLocal()
+    try:
+        from app.models.user import User
+        from app.core.security import hash_password
+        if not db.query(User).filter(User.id == "default").first():
+            db.add(User(id="default", username="default", password_hash=hash_password("default")))
+            db.commit()
+    finally:
+        db.close()
