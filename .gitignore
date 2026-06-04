@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.env
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Database ---
+*.db
+*.sqlite3
+
+# --- Uploads / Exports ---
+backend/uploads/audio/*
+backend/uploads/resumes/*
+backend/uploads/exports/*
+!backend/uploads/audio/.gitkeep
+!backend/uploads/resumes/.gitkeep
+!backend/uploads/exports/.gitkeep
+
+# --- Node / Frontend ---
+frontend/node_modules/
+frontend/dist/
+node_modules/
+
+# --- Docker volumes ---
+docker/volumes/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Misc ---
+*.log
+frontend-cdn/
