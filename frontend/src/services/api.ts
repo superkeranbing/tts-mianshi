@@ -84,3 +84,10 @@ export function getReport(id: string) {
 export function exportRecording(id: string, format: "txt" | "srt") {
   window.open(BASE + `/export/${id}/${format}`, "_blank");
 }
+
+export function updateTranscript(id: string, content: string, speakerName?: string) {
+  const fd = new FormData();
+  fd.append("content", content);
+  if (speakerName) fd.append("speaker_name", speakerName);
+  return fetch(BASE + `/recordings/transcripts/${id}`, { method: "PUT", body: fd }).then((r) => r.json());
+}

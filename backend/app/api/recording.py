@@ -62,3 +62,4 @@ async def delete_recording(recording_id: str, db: Session = Depends(get_db)):
     db.delete(recording)
     db.commit()
     return {"ok":True}
+
