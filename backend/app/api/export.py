@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from urllib.parse import quote
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import io, os, json
@@ -8,6 +9,12 @@ from app.models.recording import Recording
 from app.models.transcript import Transcript
 from app.models.interview import InterviewReport, QAPair, KnowledgePoint
 from app.config import get_settings
+def _export_basename(title: str) -> str:
+    """Strip file extension from recording title for clean export filenames"""
+    import os
+    root = os.path.splitext(title)[0]
+    return root if root else title
+
 
 router = APIRouter(prefix="/api/export", tags=["Export"])
 settings = get_settings()
@@ -49,7 +56,7 @@ async def export_txt(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="text/plain",
-        headers={"Content-Disposition": f"attachment; filename={recording.title}.txt"},
+        headers={"Content-Disposition": f"attachment; filename=\"recording.txt\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.txt"},
     )
 
 
@@ -65,7 +72,7 @@ async def export_srt(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="text/plain",
-        headers={"Content-Disposition": f"attachment; filename={recording.title}.srt"},
+        headers={"Content-Disposition": f"attachment; filename=\"recording.srt\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.srt"},
     )
 
 
@@ -96,7 +103,7 @@ async def export_docx(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename={recording.title}.docx"},
+        headers={"Content-Disposition": f"attachment; filename=\"recording.docx\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.docx"},
     )
 
 
@@ -108,7 +115,11 @@ async def export_pdf(recording_id: str, db: Session = Depends(get_db)):
     pdf.add_page()
     font_path = os.path.join(os.path.dirname(__file__), "..", "utils", "NotoSansSC-Regular.ttf")
     if os.path.exists(font_path):
-        pdf.add_font("notosans", "", font_path, uni=True)
+        try:
+            pdf.add_font("notosans", "", font_path, uni=True)
+            family = "notosans"
+        except Exception:
+            family = "Helvetica"
         family = "notosans"
     else:
         family = "Helvetica"
@@ -136,7 +147,7 @@ async def export_pdf(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         buf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={recording.title}.pdf"},
+        headers={"Content-Disposition": f"attachment; filename=\"recording.pdf\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.pdf"},
     )
 
 
@@ -155,7 +166,11 @@ async def export_report_pdf(report_id: str, db: Session = Depends(get_db)):
     pdf = FPDF()
     pdf.add_page()
     if os.path.exists(font_path):
-        pdf.add_font("notosans", "", font_path, uni=True)
+        try:
+            pdf.add_font("notosans", "", font_path, uni=True)
+            family = "notosans"
+        except Exception:
+            family = "Helvetica"
         family = "notosans"
     else:
         family = "Helvetica"
