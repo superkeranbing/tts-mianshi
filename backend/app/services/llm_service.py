@@ -128,7 +128,7 @@ class LLMService:
             lines.append(f"{sp}: {t.get('content', '')}")
         transcript_text = "\n".join(lines)
         prompt = f"总结以下面试对话，输出JSON格式：\n{transcript_text}"
-        system = "你是一个专业的面试对话分析助手。总结对话内容，提取核心话题和关键要点。输出纯JSON。"
+        system = f"你是一个专业的面试对话分析助手。总结对话内容，提取核心话题和关键要点。输出纯JSON。例如：\n{_MOCK_CONVERSATION_SUMMARY}"
         if self._is_configured():
             try:
                 return await self._call_api(system, prompt)
@@ -144,7 +144,7 @@ class LLMService:
             lines.append(f"{sp}: {t.get('content', '')}")
         transcript_text = "\n".join(lines)
         prompt = f"从以下面试对话中提取问答对，只保留面试官提问-候选人回答的配对：\n{transcript_text}"
-        system = "你是一个面试对话分析助手。提取问答对并输出JSON格式。"
+        system = f"你是一个面试对话分析助手。提取问答对并输出JSON格式。例如：\n{_MOCK_CONVERSATION_QA}"
         if self._is_configured():
             try:
                 return await self._call_api(system, prompt)
