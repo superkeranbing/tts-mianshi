@@ -1,12 +1,35 @@
-﻿import type { Recording, Transcript, Resume, InterviewReport } from "../types";
+import type { Recording, Transcript, Resume, InterviewReport } from "../types";
 
 const BASE = "/api";
 
+function getToken(): string | null {
+  try {
+    const stored = localStorage.getItem("auth_token");
+    return stored || null;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(BASE + path, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (options?.headers) {
+    if (options.headers instanceof Headers) {
+      options.headers.forEach((v, k) => { headers[k] = v; });
+    } else if (Array.isArray(options.headers)) {
+      options.headers.forEach(([k, v]) => { headers[k] = v; });
+    } else {
+      Object.assign(headers, options.headers);
+    }
+  }
+  if (!headers["Content-Type"] && !(options?.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (token) {
+    headers["Authorization"] = "Bearer " + token;
+  }
+  const res = await fetch(BASE + path, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     throw new Error(err.detail);
@@ -35,22 +58,29 @@ export function listRecordings() {
 }
 
 export function getRecording(id: string) {
-  return request<Recording & { transcripts: Transcript[] }>(`/recordings/${id}`);
+  return request<Recording & { transcripts: Transcript[] }>("/recordings/" + id);
 }
 
 export function uploadRecording(file: File, title: string) {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("title", title);
-  return fetch(BASE + "/recordings/upload", { method: "POST", body: fd }).then((r) => r.json());
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  return fetch(BASE + "/recordings/upload", { method: "POST", body: fd, headers }).then((r) => r.json());
 }
 
 export function triggerTranscribe(id: string) {
-  return request<{ status: string; segments: number }>(`/asr/${id}/transcribe`, { method: "POST" });
+  return request<{ status: string; task_id?: string; message?: string }>("/asr/" + id + "/transcribe", { method: "POST" });
+}
+
+export function getRecordingStatus(id: string) {
+  return request<{ status: string }>("/asr/" + id + "/status");
 }
 
 export function deleteRecording(id: string) {
-  return request<{ ok: boolean }>(`/recordings/${id}`, { method: "DELETE" });
+  return request<{ ok: boolean }>("/recordings/" + id, { method: "DELETE" });
 }
 
 // Resumes
@@ -61,12 +91,15 @@ export function listResumes() {
 export function uploadResume(file: File) {
   const fd = new FormData();
   fd.append("file", file);
-  return fetch(BASE + "/resumes/upload", { method: "POST", body: fd }).then((r) => r.json());
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  return fetch(BASE + "/resumes/upload", { method: "POST", body: fd, headers }).then((r) => r.json());
 }
 
 // Interview
 export function analyzeInterview(recordingId: string, resumeId?: string) {
-  return request<{ report_id: string; status: string }>("/interview/analyze", {
+  return request<{ report_id: string; status: string; cached?: boolean }>("/interview/analyze", {
     method: "POST",
     body: JSON.stringify({ recording_id: recordingId, resume_id: resumeId || null }),
   });
@@ -77,22 +110,32 @@ export function listReports() {
 }
 
 export function getReport(id: string) {
-  return request<InterviewReport>(`/interview/reports/${id}`);
+  return request<InterviewReport>("/interview/reports/" + id);
 }
 
-// Export
-export function exportRecording(id: string, format: "txt" | "srt" | "pdf" | "docx") {
-  window.open(BASE + `/export/${id}/${format}`, "_blank");
+// Conversation Summary
+export function getRecordingSummary(id: string) {
+  return request<import("../types").ConversationSummary>("/recordings/" + id + "/summary");
 }
 
-// Export report as PDF
+export function getRecordingQA(id: string) {
+  return request<import("../types").ConversationQA>("/recordings/" + id + "/qa");
+}
+
+export function exportRecording(id: string, format: "txt" | "srt" | "docx") {
+  window.open(BASE + "/export/" + id + "/" + format, "_blank");
+}
+
 export function exportReportPdf(id: string) {
-  window.open(BASE + `/export/report/${id}/pdf`, "_blank");
+  window.open(BASE + "/export/report/" + id + "/pdf", "_blank");
 }
 
 export function updateTranscript(id: string, content: string, speakerName?: string) {
   const fd = new FormData();
   fd.append("content", content);
   if (speakerName) fd.append("speaker_name", speakerName);
-  return fetch(BASE + `/recordings/transcripts/${id}`, { method: "PUT", body: fd }).then((r) => r.json());
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  return fetch(BASE + "/recordings/transcripts/" + id, { method: "PUT", body: fd, headers }).then((r) => r.json());
 }

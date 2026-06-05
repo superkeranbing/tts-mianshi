@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { register, login } from "../services/api";
 import { useAppStore } from "../stores/appStore";
@@ -21,7 +21,8 @@ export default function LoginPage() {
       const fn = isReg ? register : login;
       const { access_token, user } = await fn(username, password);
       setAuth(user, access_token);
-      localStorage.setItem("tts-auth", JSON.stringify({ user, token: access_token }));
+      localStorage.setItem("auth_token", access_token);
+      localStorage.setItem("auth_user", JSON.stringify(user));
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

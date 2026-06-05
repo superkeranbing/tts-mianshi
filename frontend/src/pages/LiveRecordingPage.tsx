@@ -34,7 +34,7 @@ export default function LiveRecordingPage() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => navigate("/")} className="text-gray-500 hover:text-gray-300 transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-        <h2 className="text-xl font-bold">??????</h2>
+        <h2 className="text-xl font-bold">实时录音</h2>
       </div>
 
       {/* Recording Controls */}
@@ -65,7 +65,7 @@ export default function LiveRecordingPage() {
         </div>
 
         <p className="text-sm text-gray-500">
-          {isRecording ? (isPaused ? "???" : "???...") : "??????"}
+          {isRecording ? (isPaused ? "已暂停" : "录音中...") : "准备录音"}
         </p>
 
         {/* Title Input */}
@@ -73,7 +73,7 @@ export default function LiveRecordingPage() {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="??????????????"
+            placeholder="输入录音标题（可选）"
             className="px-4 py-2 bg-gray-800 rounded border border-gray-700 text-white text-sm w-64 outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
@@ -90,7 +90,7 @@ export default function LiveRecordingPage() {
       {finalResults.length > 0 && (
         <div className="bg-gray-900 rounded-lg border border-gray-800">
           <div className="px-6 py-3 border-b border-gray-800 font-semibold text-sm">
-            ????
+            实时转写
           </div>
           <div className="divide-y divide-gray-800 max-h-[40vh] overflow-y-auto">
             {finalResults.map((r, i) => (
@@ -112,10 +112,11 @@ export default function LiveRecordingPage() {
       {finalResults.length === 0 && !error && (
         <div className="bg-gray-900 rounded-lg p-12 border border-gray-800 text-center">
           <Mic className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-          <p className="text-gray-500">??????????????</p>
-          <p className="text-gray-600 text-xs mt-2">?????????????????</p>
+          <p className="text-gray-500">点击麦克风开始实时录音</p>
+          <p className="text-gray-600 text-xs mt-2">录音成功后自动保存并开始转写</p>
         </div>
       )}
     </div>
   );
 }
+

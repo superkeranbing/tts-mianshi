@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 import io, os, json
 from app.core.database import get_db
+from app.core.security import require_user
 from app.models.recording import Recording
 from app.models.transcript import Transcript
 from app.models.interview import InterviewReport, QAPair, KnowledgePoint
 from app.config import get_settings
+
 def _export_basename(title: str) -> str:
     """Strip file extension from recording title for clean export filenames"""
     import os
@@ -31,8 +33,10 @@ def _fmt_mmss(sec):
     return f"{int(sec//60):02d}:{int(sec%60):02d}"
 
 
-def _load_transcripts(recording_id: str, db: Session):
-    recording = db.execute(select(Recording).where(Recording.id == recording_id)).scalar_one_or_none()
+def _load_transcripts(recording_id: str, db: Session, user_id: str):
+    recording = db.execute(
+        select(Recording).where(Recording.id == recording_id, Recording.user_id == user_id)
+    ).scalar_one_or_none()
     if not recording:
         raise HTTPException(404, "Recording not found")
     tl = db.execute(
@@ -44,8 +48,8 @@ def _load_transcripts(recording_id: str, db: Session):
 
 
 @router.get("/{recording_id}/txt")
-async def export_txt(recording_id: str, db: Session = Depends(get_db)):
-    recording, tl = _load_transcripts(recording_id, db)
+async def export_txt(recording_id: str, db: Session = Depends(get_db), user: dict = Depends(require_user)):
+    recording, tl = _load_transcripts(recording_id, db, user["id"])
     header = f"Title: {recording.title}" + chr(10)
     lines = [header]
     for t in tl:
@@ -56,13 +60,13 @@ async def export_txt(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="text/plain",
-        headers={"Content-Disposition": f"attachment; filename=\"recording.txt\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.txt"},
+        headers={"Content-Disposition": f"attachment; filename=recording.txt; filename*=UTF-8''{quote(_export_basename(recording.title))}.txt"},
     )
 
 
 @router.get("/{recording_id}/srt")
-async def export_srt(recording_id: str, db: Session = Depends(get_db)):
-    recording, tl = _load_transcripts(recording_id, db)
+async def export_srt(recording_id: str, db: Session = Depends(get_db), user: dict = Depends(require_user)):
+    recording, tl = _load_transcripts(recording_id, db, user["id"])
     lines = []
     for i, t in enumerate(tl, 1):
         sp = t.speaker_name or t.speaker
@@ -72,15 +76,15 @@ async def export_srt(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="text/plain",
-        headers={"Content-Disposition": f"attachment; filename=\"recording.srt\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.srt"},
+        headers={"Content-Disposition": f"attachment; filename=recording.srt; filename*=UTF-8''{quote(_export_basename(recording.title))}.srt"},
     )
 
 
 @router.get("/{recording_id}/docx")
-async def export_docx(recording_id: str, db: Session = Depends(get_db)):
+async def export_docx(recording_id: str, db: Session = Depends(get_db), user: dict = Depends(require_user)):
     from docx import Document
     from docx.shared import Pt, RGBColor
-    recording, tl = _load_transcripts(recording_id, db)
+    recording, tl = _load_transcripts(recording_id, db, user["id"])
     doc = Document()
     style = doc.styles["Normal"]
     style.font.name = "Arial"
@@ -103,14 +107,14 @@ async def export_docx(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename=\"recording.docx\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.docx"},
+        headers={"Content-Disposition": f"attachment; filename=recording.docx; filename*=UTF-8''{quote(_export_basename(recording.title))}.docx"},
     )
 
 
 @router.get("/{recording_id}/pdf")
-async def export_pdf(recording_id: str, db: Session = Depends(get_db)):
+async def export_pdf(recording_id: str, db: Session = Depends(get_db), user: dict = Depends(require_user)):
     from fpdf import FPDF
-    recording, tl = _load_transcripts(recording_id, db)
+    recording, tl = _load_transcripts(recording_id, db, user["id"])
     pdf = FPDF()
     pdf.add_page()
     font_path = os.path.join(os.path.dirname(__file__), "..", "utils", "NotoSansSC-Regular.ttf")
@@ -147,14 +151,16 @@ async def export_pdf(recording_id: str, db: Session = Depends(get_db)):
     return StreamingResponse(
         buf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=\"recording.pdf\"; filename*=UTF-8''{quote(_export_basename(recording.title))}.pdf"},
+        headers={"Content-Disposition": f"attachment; filename=recording.pdf; filename*=UTF-8''{quote(_export_basename(recording.title))}.pdf"},
     )
 
 
 @router.get("/report/{report_id}/pdf")
-async def export_report_pdf(report_id: str, db: Session = Depends(get_db)):
+async def export_report_pdf(report_id: str, db: Session = Depends(get_db), user: dict = Depends(require_user)):
     from fpdf import FPDF
-    report = db.execute(select(InterviewReport).where(InterviewReport.id == report_id)).scalar_one_or_none()
+    report = db.execute(
+        select(InterviewReport).where(InterviewReport.id == report_id, InterviewReport.user_id == user["id"])
+    ).scalar_one_or_none()
     if not report:
         raise HTTPException(404, "Report not found")
     qa_pairs = db.execute(select(QAPair).where(QAPair.report_id == report_id)).scalars().all()
@@ -251,7 +257,7 @@ async def export_report_pdf(report_id: str, db: Session = Depends(get_db)):
         pdf.set_text_color(100, 100, 100)
         pdf.set_font(family, "", 10)
         for p in plan:
-            pdf.cell(0, 7, f"Week " + str(p.get("week","")) + ": " + p.get("focus",""), new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 7, f"Week {p.get('week','')}: {p.get('focus','')}", new_x="LMARGIN", new_y="NEXT")
     buf = io.BytesIO()
     pdf.output(buf)
     buf.seek(0)

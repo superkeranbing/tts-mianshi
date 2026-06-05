@@ -1,6 +1,6 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { listRecordings, uploadRecording, triggerTranscribe, deleteRecording } from "../services/api";
+import { listRecordings, uploadRecording, triggerTranscribe, getRecordingStatus, deleteRecording } from "../services/api";
 import type { Recording } from "../types";
 import { Upload, Mic, FileText, Trash2, Loader2 } from "lucide-react";
 
@@ -8,6 +8,7 @@ export default function HomePage() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -17,6 +18,29 @@ export default function HomePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Poll status of processing recordings
+  useEffect(() => {
+    if (processingIds.size === 0) return;
+    const interval = setInterval(async () => {
+      let changed = false;
+      const newSet = new Set(processingIds);
+      for (const id of processingIds) {
+        try {
+          const { status } = await getRecordingStatus(id);
+          if (status === "completed" || status === "failed") {
+            newSet.delete(id);
+            changed = true;
+          }
+        } catch { /* ignore */ }
+      }
+      if (changed) {
+        setProcessingIds(newSet);
+        load();
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [processingIds, load]);
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     const file = fileRef.current?.files?.[0];
@@ -24,6 +48,7 @@ export default function HomePage() {
     setUploading(true);
     try {
       const data = await uploadRecording(file, title || file.name);
+      setProcessingIds((prev) => new Set(prev).add(data.id));
       await triggerTranscribe(data.id);
       setTitle("");
       if (fileRef.current) fileRef.current.value = "";
@@ -34,6 +59,11 @@ export default function HomePage() {
 
   const handleDelete = async (id: string) => {
     try { await deleteRecording(id); load(); } catch {}
+  };
+
+  const handleClick = (r: Recording) => {
+    if (r.status === "processing" || r.status === "pending") return;
+    navigate("/recording/" + r.id);
   };
 
   return (
@@ -80,13 +110,13 @@ export default function HomePage() {
             onClick={() => navigate("/interview")}
             className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm transition-colors"
           >
-            🎯 创建分析
+            🎆 创建分析
           </button>
           <button
             onClick={() => navigate("/history")}
             className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm transition-colors"
           >
-            📋 查看历史
+            📵 查看历史
           </button>
         </div>
       </div>
@@ -94,41 +124,50 @@ export default function HomePage() {
       {/* Recording List */}
       <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-          <h3 className="font-semibold">📂 录音列表 <span className="text-gray-500 text-sm ml-2">{recordings.length} 条记录</span></h3>
+          <h3 className="font-semibold">📨 录音列表 <span className="text-gray-500 text-sm ml-2">{recordings.length} 条记录</span></h3>
         </div>
         {recordings.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
-            <p className="text-4xl mb-3">🎙</p>
+            <p className="text-4xl mb-3">🎣</p>
             <p>暂无录音，上传一个面试录音开始吧</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-800">
-            {recordings.map((r) => (
-              <div
-                key={r.id}
-                className="px-6 py-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors cursor-pointer"
-                onClick={() => navigate(`/recording/${r.id}`)}
-              >
-                <div>
-                  <p className="font-medium">{r.title}</p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(r.created_at).toLocaleString("zh-CN")}
-                    {r.audio_duration ? ` · ${Math.floor(r.audio_duration)}秒` : ""}
-                  </p>
+            {recordings.map((r) => {
+              const isProcessing = r.status === "processing" || r.status === "pending";
+              const isFailed = r.status === "failed";
+              return (
+                <div
+                  key={r.id}
+                  className={"px-6 py-4 flex items-center justify-between transition-colors " + (isProcessing ? "cursor-not-allowed opacity-70" : isFailed ? "cursor-not-allowed opacity-50" : "hover:bg-gray-800/50 cursor-pointer")}
+                  onClick={() => handleClick(r)}
+                >
+                  <div>
+                    <p className="font-medium">{r.title}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(r.created_at).toLocaleString("zh-CN")}
+                      {r.audio_duration ? " · " + Math.floor(r.audio_duration) + "秒" : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={"text-xs px-2 py-1 rounded flex items-center gap-1 " + (
+                      r.status === "completed" ? "bg-emerald-900/50 text-emerald-400" :
+                      isFailed ? "bg-red-900/50 text-red-400" :
+                      "bg-yellow-900/50 text-yellow-400"
+                    )}>
+                      {isProcessing && <Loader2 className="w-3 h-3 animate-spin" />}
+                      {r.status === "completed" ? "已完成" : isFailed ? "处理失败" : "处理中"}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
+                      className="text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs px-2 py-1 rounded ${r.status === "completed" ? "bg-emerald-900/50 text-emerald-400" : "bg-yellow-900/50 text-yellow-400"}`}>
-                    {r.status === "completed" ? "已完成" : "处理中"}
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
-                    className="text-gray-600 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

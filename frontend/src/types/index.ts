@@ -1,4 +1,4 @@
-﻿// ====== Type Definitions ======
+// ====== Type Definitions ======
 
 export interface User {
   id: string;
@@ -73,4 +73,20 @@ export interface InterviewReport {
 
 export interface ApiError {
   detail: string;
+}
+
+// Conversation summary (lightweight, no interview analysis)
+export interface ConversationSummary {
+  summary: string;
+  topics: string[];
+  key_points: string[];
+}
+
+export interface SimpleQAPair {
+  question: string;
+  answer: string;
+}
+
+export interface ConversationQA {
+  qa_pairs: SimpleQAPair[];
 }

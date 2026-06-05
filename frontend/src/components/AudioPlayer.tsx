@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { Play, Pause, SkipBack, SkipForward, Volume2 } from "lucide-react";
 
@@ -16,6 +16,14 @@ interface Props {
   markers?: { time: number; label: string; color: string }[];
 }
 
+function getToken(): string | null {
+  try {
+    return localStorage.getItem("auth_token");
+  } catch {
+    return null;
+  }
+}
+
 const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
   ({ audioUrl, onTimeUpdate, onReady, markers }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -24,6 +32,10 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(0.7);
+
+    // Append auth token as query param for browser-native audio loading
+    const token = getToken();
+    const resolvedUrl = token ? audioUrl + "?token=" + encodeURIComponent(token) : audioUrl;
 
     useEffect(() => {
       if (!containerRef.current) return;
@@ -36,18 +48,17 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
         barGap: 1,
         barRadius: 2,
         height: 80,
-        url: audioUrl,
+        url: resolvedUrl,
         backend: "WebAudio",
       });
 
       ws.on("ready", () => {
         setDuration(ws.getDuration());
         onReady?.(ws.getDuration());
-        // Draw markers
         markers?.forEach((m) => {
           const pct = m.time / ws.getDuration();
           const markerEl = document.createElement("div");
-          markerEl.style.cssText = `position:absolute;left:${pct * 100}%;top:0;width:2px;height:100%;background:${m.color};z-index:10;cursor:pointer;`;
+          markerEl.style.cssText = "position:absolute;left:" + (pct * 100) + "%;top:0;width:2px;height:100%;background:" + m.color + ";z-index:10;cursor:pointer;";
           markerEl.title = m.label;
           containerRef.current?.appendChild(markerEl);
         });
@@ -63,7 +74,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
       wsRef.current = ws;
 
       return () => { ws.destroy(); };
-    }, [audioUrl]);
+    }, [resolvedUrl]);
 
     useEffect(() => { wsRef.current?.setVolume(volume); }, [volume]);
 
@@ -76,7 +87,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
 
     const togglePlay = () => { isPlaying ? wsRef.current?.pause() : wsRef.current?.play(); };
     const skip = (s: number) => wsRef.current?.seekTo(Math.min(1, Math.max(0, (currentTime + s) / (duration || 1))));
-    const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    const fmt = (s: number) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 
     return (
       <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">

@@ -1,4 +1,4 @@
-﻿"""
+"""
 ASR Engine - 音频转写 + 说话人分离 (Speaker Diarization)
 ====================================================
 
@@ -211,10 +211,9 @@ class ASREngine:
           linkage:      聚类链接方式。"complete"紧凑 / "average"一般 / "single"宽松
           batch_size_s: ASR 批次时长 (入参)。默认 300。值小更精确但慢
         """
-        import numpy as np
-        from funasr.models.campplus.cluster_backend import ClusterBackend
-
         try:
+            import numpy as np
+            from funasr.models.campplus.cluster_backend import ClusterBackend
             from funasr import AutoModel
             import torchaudio
             import torchaudio.transforms as T

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+﻿from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json, asyncio, io, os, uuid, tempfile, random, logging
 
 router = APIRouter(prefix="/ws", tags=["WebSocket"])
@@ -63,17 +63,17 @@ async def websocket_asr_stream(ws: WebSocket):
 
 
 MOCK_PARTIALS = [
-    "????",
-    "??????????",
-    "?????Rea",
-    "?????React???DOM???",
-    "??????????????????",
-    "???????????",
-    "?????????",
-    "?????????",
+   "请简单介绍",
+   "请简单介绍一下你自己",
+   "能谈谈Rea",
+   "能谈谈React的虚拟DOM原理吗",
+   "你在项目中遇到的最大技术挑战",
+   "你如何保证前端代码质量",
+   "你对未来的职业规划",
+   "你对未来的职业规划",
 ]
 
-MOCK_SPEAKERS = ["???", "???", "???", "???", "???", "???", "???"]
+MOCK_SPEAKERS = ["面试官", "候选人", "面试官", "候选人", "面试官", "候选人", "面试官"]
 
 
 async def _simulate_partial(buffer: bytearray, count: int) -> dict:
@@ -93,9 +93,11 @@ async def _simulate_final(buffer: bytearray) -> dict:
     dur_sec = len(buffer) / 16000 / 2  # rough wav duration
     return {
         "type": "final_result",
-        "text": "???????????",
+        "text": "你如何保证前端代码质量",
         "speaker": random.choice(MOCK_SPEAKERS),
         "is_final": True,
         "start_time": 0.0,
         "end_time": round(dur_sec, 1),
     }
+
+

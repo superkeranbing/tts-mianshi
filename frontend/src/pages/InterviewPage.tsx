@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { listRecordings, listResumes, uploadResume, analyzeInterview } from "../services/api";
 import type { Recording, Resume } from "../types";

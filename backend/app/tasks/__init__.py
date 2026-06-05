@@ -6,14 +6,14 @@ from app.models.transcript import Transcript
 from app.models.interview import InterviewReport, QAPair, KnowledgePoint
 from app.services.asr_engine import asr_engine
 from app.services.llm_service import llm_service
-import json, logging
+import json, asyncio, logging
 
 logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, name="tasks.transcribe_audio", max_retries=3, default_retry_delay=30)
 def transcribe_audio_task(self, recording_id: str):
-    """Real async ASR transcription task"""
+    """Real async ASR transcription task with summary + QA generation"""
     logger.info(f"Starting transcription for {recording_id}")
     db = SessionLocal()
     try:
@@ -21,6 +21,9 @@ def transcribe_audio_task(self, recording_id: str):
         if not recording:
             logger.error(f"Recording {recording_id} not found")
             return {"error": "Recording not found"}
+
+        recording.status = "processing"
+        db.commit()
 
         # Run ASR engine
         import asyncio
@@ -41,11 +44,35 @@ def transcribe_audio_task(self, recording_id: str):
             ))
         db.commit()
         logger.info(f"Transcription completed for {recording_id}: {len(segments)} segments")
+
+        # Generate summary and QA and cache in DB
+        if segments:
+            transcript_data = [
+                {"speaker": t.speaker, "speaker_name": t.speaker_name, "content": t.content}
+                for t in db.query(Transcript)
+                .filter(Transcript.recording_id == recording_id)
+                .order_by(Transcript.start_time).all()
+            ]
+            try:
+                summary_result = asyncio.run(llm_service.summarize_conversation(transcript_data))
+                recording.summary_json = json.dumps(summary_result, ensure_ascii=False)
+                logger.info(f"Summary generated for {recording_id}")
+            except Exception as e:
+                logger.error(f"Summary generation failed for {recording_id}: {e}")
+
+            try:
+                qa_result = asyncio.run(llm_service.extract_qa_pairs(transcript_data))
+                recording.qa_json = json.dumps(qa_result, ensure_ascii=False)
+                logger.info(f"QA extracted for {recording_id}")
+            except Exception as e:
+                logger.error(f"QA extraction failed for {recording_id}: {e}")
+
+            db.commit()
+
         return {"recording_id": recording_id, "status": "completed", "segments": len(segments)}
 
     except Exception as e:
         logger.error(f"Transcription failed for {recording_id}: {e}")
-        # Update status to failed
         try:
             rec = db.query(Recording).filter(Recording.id == recording_id).first()
             if rec:
@@ -64,14 +91,12 @@ def analyze_interview_task(self, recording_id: str, resume_id: str = None, user_
     logger.info(f"Starting interview analysis for {recording_id}")
     db = SessionLocal()
     try:
-        # Get transcripts
         transcripts = db.query(Transcript).filter(Transcript.recording_id == recording_id).order_by(Transcript.start_time).all()
         transcript_data = [
             {"speaker": t.speaker, "speaker_name": t.speaker_name, "content": t.content}
             for t in transcripts
         ]
 
-        # Get resume text if available
         resume_text = None
         if resume_id:
             from app.models.resume import Resume
@@ -79,11 +104,9 @@ def analyze_interview_task(self, recording_id: str, resume_id: str = None, user_
             if resume:
                 resume_text = resume.raw_text
 
-        # Run LLM analysis
         import asyncio
         analysis = asyncio.run(llm_service.analyze_interview(transcript_data, resume_text))
 
-        # Save report
         report = InterviewReport(
             user_id=user_id,
             recording_id=recording_id,

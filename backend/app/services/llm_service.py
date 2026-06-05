@@ -120,6 +120,54 @@ class LLMService:
                 logger.error(f"Answer generation failed: {e}")
         return "（请配置LLM_API_KEY以生成个性化答案）"
 
+    async def summarize_conversation(self, transcripts: list[dict]) -> dict:
+        """Generate a concise summary from conversation transcripts"""
+        lines = []
+        for t in transcripts:
+            sp = t.get("speaker_name") or t.get("speaker", "未知")
+            lines.append(f"{sp}: {t.get('content', '')}")
+        transcript_text = "\n".join(lines)
+        prompt = f"总结以下面试对话，输出JSON格式：\n{transcript_text}"
+        system = "你是一个专业的面试对话分析助手。总结对话内容，提取核心话题和关键要点。输出纯JSON。"
+        if self._is_configured():
+            try:
+                return await self._call_api(system, prompt)
+            except Exception as e:
+                logger.error(f"Summarization failed: {e}")
+        return _MOCK_CONVERSATION_SUMMARY
+
+    async def extract_qa_pairs(self, transcripts: list[dict]) -> dict:
+        """Extract Q&A pairs from conversation transcripts"""
+        lines = []
+        for t in transcripts:
+            sp = t.get("speaker_name") or t.get("speaker", "未知")
+            lines.append(f"{sp}: {t.get('content', '')}")
+        transcript_text = "\n".join(lines)
+        prompt = f"从以下面试对话中提取问答对，只保留面试官提问-候选人回答的配对：\n{transcript_text}"
+        system = "你是一个面试对话分析助手。提取问答对并输出JSON格式。"
+        if self._is_configured():
+            try:
+                return await self._call_api(system, prompt)
+            except Exception as e:
+                logger.error(f"QA extraction failed: {e}")
+        return _MOCK_CONVERSATION_QA
+
+
+_MOCK_CONVERSATION_SUMMARY = {
+    "summary": "这是一场前端开发岗位的面试。面试官围绕候选人的技术能力、项目经验和职业规划进行了深入提问。候选人展示了扎实的React基础和项目实战经验。",
+    "topics": ["自我介绍与背景", "React核心技术", "项目实战经验", "代码质量实践", "职业发展规划"],
+    "key_points": ["候选人3年前端开发经验", "熟悉React虚拟DOM和Fiber架构", "有大数据量列表性能优化经验", "使用ESLint+Prettier保障代码质量", "未来希望在架构方向深入发展"],
+}
+
+_MOCK_CONVERSATION_QA = {
+    "qa_pairs": [
+        {"question": "请简单介绍一下你自己。", "answer": "我叫张三，毕业于XX大学计算机科学专业，有3年前端开发经验，熟悉React技术栈。"},
+        {"question": "能详细说说React的虚拟DOM原理吗？", "answer": "虚拟DOM是React创建的核心优化概念。它使用JavaScript对象来模拟真实DOM结构，当状态发生变化时，通过Diff算法比较新旧虚拟DOM树的差异，计算出最小的DOM更新操作，批量执行真实DOM更新。"},
+        {"question": "你在项目中遇到过的最大技术挑战是什么？", "answer": "在处理大数据量列表时遇到了严重的性能问题。团队采用了虚拟滚动方案来优化，只渲染可视区域内的列表项，将渲染时间从3秒降到了200毫秒。"},
+        {"question": "你如何保证前端代码质量？", "answer": "我们团队采用了ESLint+Prettier统一代码风格，配合Code Review流程。在CI阶段运行自动化测试和Lint检查，确保代码质量。"},
+        {"question": "你对未来的职业规划有什么考虑？", "answer": "短期希望在前端架构方向深耕，中期希望能承担技术架构角色，长期成为前端领域的专家。"},
+    ]
+}
 
 # Mock data for fallback
 _MOCK_ANALYSIS = {

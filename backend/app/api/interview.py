@@ -1,8 +1,9 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, and_
 import json
 from app.core.database import get_db
+from app.core.security import require_user
 from app.models.recording import Recording
 from app.models.interview import InterviewReport, QAPair, KnowledgePoint
 from app.schemas import AnalyzeRequest, InterviewReportResponse, QAPairResponse, KnowledgePointResponse
@@ -30,13 +31,20 @@ _MOCK_FALLBACK = {
 
 
 @router.post("/analyze")
-async def create_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
-    recording = db.execute(select(Recording).where(Recording.id == req.recording_id)).scalar_one_or_none()
+async def create_analysis(req: AnalyzeRequest, db: Session = Depends(get_db), user: dict = Depends(require_user)):
+    recording = db.execute(
+        select(Recording).where(Recording.id == req.recording_id, Recording.user_id == user["id"])
+    ).scalar_one_or_none()
     if not recording:
         raise HTTPException(404, "录音不存在")
 
-        # Return existing report if already analyzed
-    existing = db.execute(select(InterviewReport).where(InterviewReport.recording_id == req.recording_id).limit(1)).scalar_one_or_none()
+    # Return existing report if already analyzed with same recording + resume
+    conditions = [InterviewReport.recording_id == req.recording_id]
+    if req.resume_id:
+        conditions.append(InterviewReport.resume_id == req.resume_id)
+    existing = db.execute(
+        select(InterviewReport).where(and_(*conditions)).limit(1)
+    ).scalar_one_or_none()
     if existing:
         return {"report_id": existing.id, "status": "completed", "cached": True}
 
@@ -55,7 +63,9 @@ async def create_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
     resume_text = None
     if req.resume_id:
         from app.models.resume import Resume
-        resume = db.execute(select(Resume).where(Resume.id == req.resume_id)).scalar_one_or_none()
+        resume = db.execute(
+            select(Resume).where(Resume.id == req.resume_id, Resume.user_id == user["id"])
+        ).scalar_one_or_none()
         if resume:
             resume_text = resume.raw_text
 
@@ -64,7 +74,7 @@ async def create_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
 
     # Save report
     report = InterviewReport(
-        user_id="default",
+        user_id=user["id"],
         recording_id=req.recording_id,
         resume_id=req.resume_id,
         overall_score=analysis.get("overall_score"),
@@ -103,14 +113,18 @@ async def create_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/reports", response_model=list[InterviewReportResponse])
-async def list_reports(db: Session = Depends(get_db)):
-    reports = db.execute(select(InterviewReport).order_by(InterviewReport.created_at.desc())).scalars().all()
+async def list_reports(db: Session = Depends(get_db), user: dict = Depends(require_user)):
+    reports = db.execute(
+        select(InterviewReport).where(InterviewReport.user_id == user["id"]).order_by(InterviewReport.created_at.desc())
+    ).scalars().all()
     return [_serialize(r) for r in reports]
 
 
 @router.get("/reports/{report_id}", response_model=InterviewReportResponse)
-async def get_report(report_id: str, db: Session = Depends(get_db)):
-    report = db.execute(select(InterviewReport).where(InterviewReport.id == report_id)).scalar_one_or_none()
+async def get_report(report_id: str, db: Session = Depends(get_db), user: dict = Depends(require_user)):
+    report = db.execute(
+        select(InterviewReport).where(InterviewReport.id == report_id, InterviewReport.user_id == user["id"])
+    ).scalar_one_or_none()
     if not report:
         raise HTTPException(404, "报告不存在")
     return _serialize(report)

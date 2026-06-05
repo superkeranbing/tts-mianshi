@@ -26,3 +26,5 @@ modelscope>=1.30.0
 torch>=2.0.0
 torchaudio>=2.0.0
 scikit-learn>=1.0.0
+
+fpdf2>=2.7.0

@@ -16,6 +16,8 @@ class Recording(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     language: Mapped[str] = mapped_column(String(10), default="zh")
     metadata_json: Mapped[str] = mapped_column(SQLiteText, default="{}")
+    summary_json: Mapped[str | None] = mapped_column(SQLiteText, nullable=True)
+    qa_json: Mapped[str | None] = mapped_column(SQLiteText, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     transcripts: Mapped[list["Transcript"]] = relationship("Transcript", back_populates="recording", cascade="all, delete-orphan")
     interview_report: Mapped[list["InterviewReport"]] = relationship("InterviewReport", back_populates="recording", cascade="all, delete-orphan")

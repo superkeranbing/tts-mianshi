@@ -1,4 +1,10 @@
-﻿from celery import Celery
+import os, sys
+# Ensure backend directory is in Python path for all celery processes
+_backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+
+from celery import Celery
 from app.config import get_settings
 
 settings = get_settings()
@@ -7,6 +13,7 @@ celery_app = Celery(
     "tts_mianshi",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
+    include=["app.tasks"],
 )
 
 celery_app.conf.update(

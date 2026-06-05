@@ -1,4 +1,4 @@
-﻿import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAppStore } from "../../stores/appStore";
 
 export default function Navbar() {
