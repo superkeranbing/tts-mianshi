@@ -168,12 +168,20 @@ export default function RecordingPage() {
         <button onClick={handleAnalyze} disabled={analyzing} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded text-sm transition-colors flex items-center gap-1.5">
           {analyzing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> 分析中</> : <><Brain className="w-3.5 h-3.5" /> 面试分析</>}
         </button>
-        <button onClick={() => id && exportRecording(id, "txt")} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors flex items-center gap-1.5">
-          <Download className="w-3.5 h-3.5" /> TXT
-        </button>
-        <button onClick={() => id && exportRecording(id, "srt")} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors flex items-center gap-1.5">
-          <Download className="w-3.5 h-3.5" /> SRT
-        </button>
+        <div className="flex gap-1">
+          <button onClick={() => id && exportRecording(id, "txt")} className="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs transition-colors" title="Export TXT">
+            TXT
+          </button>
+          <button onClick={() => id && exportRecording(id, "srt")} className="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs transition-colors" title="Export SRT">
+            SRT
+          </button>
+          <button onClick={() => id && exportRecording(id, "pdf")} className="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs transition-colors" title="Export PDF">
+            PDF
+          </button>
+          <button onClick={() => id && exportRecording(id, "docx")} className="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs transition-colors" title="Export DOCX">
+            DOCX
+          </button>
+        </div>
       </div>
 
       {/* Bookmarks */}

@@ -20,7 +20,7 @@ export default function HomePage() {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     const file = fileRef.current?.files?.[0];
-    if (!file) return;
+    if (!file) { fileRef.current?.click(); return; }
     setUploading(true);
     try {
       const data = await uploadRecording(file, title || file.name);

@@ -35,6 +35,11 @@ async def create_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
     if not recording:
         raise HTTPException(404, "录音不存在")
 
+        # Return existing report if already analyzed
+    existing = db.execute(select(InterviewReport).where(InterviewReport.recording_id == req.recording_id).limit(1)).scalar_one_or_none()
+    if existing:
+        return {"report_id": existing.id, "status": "completed", "cached": True}
+
     # Collect transcripts for LLM analysis
     from app.models.transcript import Transcript
     transcripts = db.execute(
@@ -111,6 +116,21 @@ async def get_report(report_id: str, db: Session = Depends(get_db)):
     return _serialize(report)
 
 
+def _normalize_kp_resources(data: list) -> list[dict]:
+    """Normalize knowledge point resources to list[dict] format"""
+    if not data:
+        return []
+    result = []
+    for item in data:
+        if isinstance(item, dict):
+            result.append(item)
+        elif isinstance(item, str):
+            result.append({"title": item, "url": ""})
+        else:
+            result.append({"title": str(item), "url": ""})
+    return result
+
+
 def _serialize(r: InterviewReport) -> InterviewReportResponse:
     return InterviewReportResponse(
         id=r.id, recording_id=r.recording_id, resume_id=r.resume_id,
@@ -120,6 +140,6 @@ def _serialize(r: InterviewReport) -> InterviewReportResponse:
         improvement_plan=json.loads(r.improvement_plan_json) if r.improvement_plan_json else [],
         summary=r.summary,
         qa_pairs=[QAPairResponse(id=qa.id, question=qa.question, question_category=qa.question_category, your_answer=qa.your_answer, best_answer=qa.best_answer, answer_score=qa.answer_score, improvement_suggestions=qa.improvement_suggestions) for qa in r.qa_pairs],
-        knowledge_points=[KnowledgePointResponse(id=kp.id, title=kp.title, category=kp.category, key_concepts=json.loads(kp.key_concepts_json) if kp.key_concepts_json else [], content=kp.content, resources=json.loads(kp.resources_json) if kp.resources_json else [], interview_tips=json.loads(kp.interview_tips_json) if kp.interview_tips_json else []) for kp in r.knowledge_points],
+        knowledge_points=[KnowledgePointResponse(id=kp.id, title=kp.title, category=kp.category, key_concepts=json.loads(kp.key_concepts_json) if kp.key_concepts_json else [], content=kp.content, resources=_normalize_kp_resources(json.loads(kp.resources_json)) if kp.resources_json else [], interview_tips=json.loads(kp.interview_tips_json) if kp.interview_tips_json else []) for kp in r.knowledge_points],
         created_at=r.created_at,
     )

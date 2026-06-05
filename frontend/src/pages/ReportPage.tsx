@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getReport } from "../services/api";
 import type { InterviewReport } from "../types";
-import { ArrowLeft, Trophy, AlertTriangle, BookOpen, Target } from "lucide-react";
+import { ArrowLeft, Trophy, AlertTriangle, BookOpen, Target, Download } from "lucide-react";
+import { exportReportPdf } from "../services/api";
 
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();

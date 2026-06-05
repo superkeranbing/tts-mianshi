@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+.env
+*.db
+.git
+uploads/audio/*
+uploads/exports/*
+!uploads/*/.gitkeep
+tts_mianshi.db
+frontend-cdn
+frontend
+docker

@@ -10,12 +10,22 @@
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d tts_mianshi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: tts-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   minio:
     image: docker.m.daocloud.io/minio/minio:latest
@@ -29,6 +39,51 @@
       - "9001:9001"
     volumes:
       - miniodata:/data
+
+  backend:
+    build: ../backend
+    container_name: tts-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://dev:dev123@postgres:5432/tts_mianshi
+      SYNC_DATABASE_URL: postgresql://dev:dev123@postgres:5432/tts_mianshi
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8000,http://localhost:80
+      DEBUG: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../backend/uploads:/app/uploads
+      - ../backend/models:/app/models
+
+  frontend-dev:
+    image: node:22-alpine
+    container_name: tts-frontend-dev
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://backend:8000
+    command: sh -c "npm install --registry https://registry.npmmirror.com && npx vite --host 0.0.0.0 --port 5173"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  frontend:
+    build: ../frontend
+    container_name: tts-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    profiles:
+      - prod
 
 volumes:
   pgdata:

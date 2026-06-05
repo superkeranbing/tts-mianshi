@@ -6,6 +6,7 @@ import HistoryPage from "./pages/HistoryPage";
 import InterviewPage from "./pages/InterviewPage";
 import ReportPage from "./pages/ReportPage";
 import LoginPage from "./pages/LoginPage";
+import LiveRecordingPage from "./pages/LiveRecordingPage";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/recording/new" element={<LiveRecordingPage />} />
           <Route path="/recording/:id" element={<RecordingPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/interview" element={<InterviewPage />} />

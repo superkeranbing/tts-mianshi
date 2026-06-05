@@ -1,23 +1,17 @@
 ﻿"""ASR Engine - 真实音频处理 + 可插拔 ASR 后端架构
-
 支持后端:
   - funasr:   FunASR Paraformer + SenseVoice + CAM++ (生产推荐)
   - whisper:  OpenAI Whisper / faster-whisper (英文/多语言)
   - sherpa:   Sherpa-ONNX (CPU 边缘部署)
   - mock:     模拟引擎 (开发/测试用，无模型依赖)
-
 安装 FunASR:  pip install funasr modelscope
 安装 Whisper:  pip install faster-whisper
 安装 Sherpa:   pip install sherpa-onnx
 """
-
-import os, wave, logging, random, hashlib
+import os, wave, logging, random, hashlib,re
 from typing import Optional
 from dataclasses import dataclass, field
-
 logger = logging.getLogger(__name__)
-
-
 @dataclass
 class AudioMeta:
     path: str
@@ -26,8 +20,6 @@ class AudioMeta:
     sample_rate: int
     channels: int
     file_size: int       # bytes
-
-
 @dataclass
 class TranscriptSegment:
     speaker: str
@@ -36,11 +28,8 @@ class TranscriptSegment:
     start_time: float
     end_time: float
     confidence: float = 0.95
-
-
 class ASREngine:
     """统一 ASR 引擎接口 - 音频处理 + 可选模型推理"""
-
     MOCK_DIALOG = [
         ("面试官", "面试官李", "请简单介绍一下你自己。"),
         ("候选人", "张三", "面试官好，我叫张三，毕业于XX大学计算机科学专业，有5年前端开发经验。在上一家公司负责企业级中后台管理系统架构，主导了从Vue2到React+TypeScript的技术栈迁移。"),
@@ -55,27 +44,22 @@ class ASREngine:
         ("面试官", "面试官李", "好的，你有什么想问我们的吗？"),
         ("候选人", "张三", "我想了解一下团队目前的技术栈和研发流程，以及这个岗位未来一年内主要负责的业务方向。"),
     ]
-
     def __init__(self, backend: str = "mock", model_dir: str = "./models"):
         self.backend = backend
         self.model_dir = model_dir
         self._funasr_model = None
         self._whisper_model = None
         logger.info(f"ASREngine initialized: backend={backend}")
-
     # ---- Audio Processing (always real) ----
-
     def read_audio_meta(self, file_path: str) -> AudioMeta:
         """读取音频元数据：格式/时长/采样率/声道数"""
         ext = os.path.splitext(file_path)[1].lower().lstrip(".")
         file_size = os.path.getsize(file_path)
-
         if ext == "wav":
             return self._read_wav(file_path, ext, file_size)
         else:
             # Try pydub for other formats (needs ffmpeg)
             return self._read_with_pydub(file_path, ext, file_size)
-
     def _read_wav(self, path: str, fmt: str, size: int) -> AudioMeta:
         with wave.open(path, "rb") as wf:
             return AudioMeta(
@@ -85,7 +69,6 @@ class ASREngine:
                 channels=wf.getnchannels(),
                 file_size=size,
             )
-
     def _read_with_pydub(self, path: str, fmt: str, size: int) -> AudioMeta:
         try:
             from pydub import AudioSegment
@@ -107,9 +90,7 @@ class ASREngine:
                 channels=info.channels,
                 file_size=size,
             )
-
     # ---- VAD (Voice Activity Detection) ----
-
     def segment_by_vad(self, meta: AudioMeta) -> list[dict]:
         """
         VAD 切分: 将音频按静音段切分为语音片段。
@@ -119,20 +100,16 @@ class ASREngine:
         num_segments = max(1, int(meta.duration / ideal_seg_duration))
         # Match mock dialog length if available
         num_segments = min(num_segments, len(self.MOCK_DIALOG))
-
         segments = []
         for i in range(num_segments):
             start = i * (meta.duration / num_segments)
             end = (i + 1) * (meta.duration / num_segments) if i < num_segments - 1 else meta.duration
             segments.append({"start": round(start, 2), "end": round(end, 2)})
         return segments
-
     # ---- ASR Transcription ----
-
     async def transcribe(self, file_path: str) -> list[TranscriptSegment]:
         """
         转写音频文件 → 带时间戳的转录段落列表。
-
         Pipeline:
           1. 读取音频元数据 (duration, sr, channels)
           2. VAD 切分 → 语音片段
@@ -141,20 +118,65 @@ class ASREngine:
         """
         meta = self.read_audio_meta(file_path)
         logger.info(f"Audio: {meta.duration:.1f}s, {meta.sample_rate}Hz, {meta.channels}ch")
-
         vad_segments = self.segment_by_vad(meta)
-
         # --- Real model path ---
         if self.backend == "funasr":
-            return await self._transcribe_funasr(file_path, vad_segments)
+            results = await self._transcribe_funasr(file_path, vad_segments)
+            return self._post_process_speakers(results, meta)
         elif self.backend == "whisper":
-            return await self._transcribe_whisper(file_path, vad_segments)
+            results = await self._transcribe_whisper(file_path, vad_segments)
+            return self._post_process_speakers(results, meta)
         elif self.backend == "sherpa":
             return await self._transcribe_sherpa(file_path, vad_segments)
-
         # --- Mock path ---
-        return self._transcribe_mock(meta, vad_segments)
+        results = self._transcribe_mock(meta, vad_segments)
+        return self._post_process_speakers(results, meta)
+    def _post_process_speakers(self, segments: list[TranscriptSegment], meta: AudioMeta) -> list[TranscriptSegment]:
+        """Post-process segments to assign speakers if missing"""
+        if not segments:
+            return segments
+        
+        all_unknown = all(s.speaker == "未知" for s in segments)
+        if not all_unknown:
+            return segments
+        
+        # If only one segment, split it by estimated speaking turns
+        if len(segments) == 1:
+            text = segments[0].content
+            total_dur = segments[0].end_time - segments[0].start_time or 60
+            # Split by sentence endings
+            sentences = re.split(r'(?<=[.!?])', text)
 
+            sentences = [s.strip() for s in sentences if s.strip()]
+            if len(sentences) < 2:
+                # Fallback: split into equal parts
+                chunk_size = max(1, len(text) // 6)
+                parts = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+                sentences = parts
+            
+            results = []
+            speakers = ["面试官", "候选人"]
+            seg_dur = total_dur / max(1, len(sentences))
+            time_per_sentence = total_dur / max(1, len(sentences))
+            for i, sent in enumerate(sentences):
+                spk = speakers[i % 2]
+                results.append(TranscriptSegment(
+                    speaker=spk,
+                    speaker_name=spk + ("李" if i % 2 == 0 else "张三"),
+                    content=sent,
+                    start_time=round(i * time_per_sentence, 2),
+                    end_time=round((i + 1) * time_per_sentence, 2),
+                    confidence=segments[0].confidence,
+                ))
+            return results
+        
+        # Multiple segments: assign alternating speakers
+        speakers = ["面试官", "候选人"]
+        for i, s in enumerate(segments):
+            spk = speakers[i % 2]
+            s.speaker = spk
+            s.speaker_name = spk + ("李" if i % 2 == 0 else "张三")
+        return segments
     def _transcribe_mock(self, meta: AudioMeta, vad_segments: list[dict]) -> list[TranscriptSegment]:
         """Mock transcription: 使用内嵌对话数据，映射到真实音频时长"""
         results = []
@@ -170,9 +192,7 @@ class ASREngine:
                 confidence=round(random.uniform(0.88, 0.99), 2),
             ))
         return results
-
     # ==== Real ASR backends (需安装对应包) ====
-
     async def _transcribe_funasr(self, path: str, segments: list[dict]) -> list[TranscriptSegment]:
         """FunASR Paraformer-large + SenseVoice + CAM++"""
         try:
@@ -189,7 +209,6 @@ class ASREngine:
         except ImportError:
             logger.warning("FunASR not installed, falling back to mock")
             return self._transcribe_mock(AudioMeta(path, "wav", 130, 16000, 1, 0), segments)
-
     async def _transcribe_whisper(self, path: str, segments: list[dict]) -> list[TranscriptSegment]:
         """faster-whisper"""
         try:
@@ -201,7 +220,6 @@ class ASREngine:
         except ImportError:
             logger.warning("faster-whisper not installed, falling back to mock")
             return self._transcribe_mock(AudioMeta(path, "wav", 130, 16000, 1, 0), segments)
-
     async def _transcribe_sherpa(self, path: str, segments: list[dict]) -> list[TranscriptSegment]:
         """Sherpa-ONNX"""
         try:
@@ -211,9 +229,7 @@ class ASREngine:
         except ImportError:
             logger.warning("sherpa-onnx not installed, falling back to mock")
             return self._transcribe_mock(AudioMeta(path, "wav", 130, 16000, 1, 0), segments)
-
     # ---- Result parsers ----
-
     def _parse_funasr_result(self, result: list) -> list[TranscriptSegment]:
         results = []
         for item in result:
@@ -226,7 +242,6 @@ class ASREngine:
                 confidence=item.get("confidence", 0.9),
             ))
         return results
-
     def _parse_whisper_result(self, segments) -> list[TranscriptSegment]:
         results = []
         for seg in segments:
@@ -238,7 +253,5 @@ class ASREngine:
                 confidence=round(1.0 - seg.avg_logprob / abs(seg.avg_logprob or 1), 2),
             ))
         return results
-
-
 # Global instance
-asr_engine = ASREngine(backend="mock")
+asr_engine = ASREngine(backend="funasr")

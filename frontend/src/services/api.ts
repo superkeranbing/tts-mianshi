@@ -81,8 +81,13 @@ export function getReport(id: string) {
 }
 
 // Export
-export function exportRecording(id: string, format: "txt" | "srt") {
+export function exportRecording(id: string, format: "txt" | "srt" | "pdf" | "docx") {
   window.open(BASE + `/export/${id}/${format}`, "_blank");
+}
+
+// Export report as PDF
+export function exportReportPdf(id: string) {
+  window.open(BASE + `/export/report/${id}/pdf`, "_blank");
 }
 
 export function updateTranscript(id: string, content: string, speakerName?: string) {
