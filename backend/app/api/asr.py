@@ -1,5 +1,4 @@
-import asyncio
-import logging
+﻿import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -26,10 +25,10 @@ async def trigger_transcribe(recording_id: str, db: Session = Depends(get_db), u
     recording.status = "processing"
     db.commit()
 
-    from app.tasks import process_recording
-    asyncio.create_task(asyncio.to_thread(process_recording, recording_id))
+    from app.tasks.asr_tasks import transcribe_audio_task
+    task = transcribe_audio_task.delay(recording_id)
 
-    return {"status": "processing", "message": u"\u8f6c\u5199\u4e2d\u2026"}
+    return {"status": "processing", "task_id": task.id, "message": u"\u8f6c\u5199\u4e2d\u2026"}
 
 
 @router.get("/{recording_id}/status")

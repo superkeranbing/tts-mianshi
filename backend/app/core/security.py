@@ -1,9 +1,12 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 from jose import jwt, JWTError
 import bcrypt
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.models.user import User
 from app.config import get_settings
 
 settings = get_settings()
@@ -46,7 +49,11 @@ def get_current_user(
 
 def require_user(
     user: Optional[dict] = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> dict:
+    """Return authenticated user, verifying the user still exists in the database."""
     if not user:
-        raise HTTPException(401, "请先登录")
+        raise HTTPException(401, "\u8bf7\u5148\u767b\u5f55")
+    if not db.query(User).filter(User.id == user["id"]).first():
+        raise HTTPException(401, "\u7528\u6237\u4e0d\u5b58\u5728\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55")
     return user

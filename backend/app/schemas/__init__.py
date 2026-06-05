@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -81,6 +81,7 @@ class KnowledgePointResponse(BaseModel):
 
 class InterviewReportResponse(BaseModel):
     id: str
+    status: str = "pending"
     recording_id: str
     resume_id: Optional[str] = None
     overall_score: Optional[float] = None
