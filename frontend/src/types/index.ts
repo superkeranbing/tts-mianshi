@@ -61,6 +61,7 @@ export interface InterviewReport {
   id: string;
   recording_id: string;
   resume_id?: string;
+  status: string;
   overall_score?: number;
   strengths: string[];
   weaknesses: string[];

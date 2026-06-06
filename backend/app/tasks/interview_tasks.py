@@ -1,4 +1,4 @@
-﻿"""Celery tasks for interview analysis"""
+"""Celery tasks for interview analysis"""
 
 import json
 import logging
@@ -43,7 +43,21 @@ def analyze_interview_task(self, report_id: str):
         if report.resume_id:
             resume = db.query(Resume).filter(Resume.id == report.resume_id).first()
             if resume:
-                resume_text = resume.raw_text
+                # Use cached text if available, otherwise extract on demand
+                if resume.raw_text and resume.raw_text.strip():
+                    resume_text = resume.raw_text
+                elif resume.file_path:
+                    try:
+                        from app.services.resume_parser import resume_parser
+                        if resume.file_type == "pdf":
+                            resume_text = asyncio.run(resume_parser._parse_pdf(resume.file_path))
+                        elif resume.file_type in ("doc", "docx"):
+                            resume_text = asyncio.run(resume_parser._parse_docx(resume.file_path))
+                        if resume_text:
+                            resume.raw_text = resume_text
+                            db.commit()
+                    except Exception as e:
+                        logger.error(f"Resume text extraction failed: {e}")
 
         from app.services.llm_service import llm_service
         analysis = asyncio.run(llm_service.analyze_interview(transcript_data, resume_text))

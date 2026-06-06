@@ -83,6 +83,10 @@ export function deleteRecording(id: string) {
   return request<{ ok: boolean }>("/recordings/" + id, { method: "DELETE" });
 }
 
+export function deleteResume(id: string) {
+  return request<{ ok: boolean }>("/resumes/" + id, { method: "DELETE" });
+}
+
 // Resumes
 export function listResumes() {
   return request<Resume[]>("/resumes");
