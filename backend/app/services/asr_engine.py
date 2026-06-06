@@ -213,15 +213,27 @@ class ASREngine:
         """
         try:
             import numpy as np
+            import torch
             from funasr.models.campplus.cluster_backend import ClusterBackend
             from funasr import AutoModel
             import torchaudio
             import torchaudio.transforms as T
 
+            # region debug-point gpu-device-selection
+            debug_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            logger.info(
+                "FunASR debug: cuda_available=%s, cuda_device_count=%s, selected_device=%s",
+                torch.cuda.is_available(),
+                torch.cuda.device_count(),
+                debug_device,
+            )
+            # endregion debug-point gpu-device-selection
+
             # 懒加载三个独立模型（共享 FunASR 权重缓存）
             if not self._vad_model:
                 self._vad_model = AutoModel(
                     model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+                    device=debug_device,
                     disable_update=True, log_level="WARNING",
                 )
                 # VAD 灵敏度调节（可选）:
@@ -230,6 +242,7 @@ class ASREngine:
             if not self._campp_model:
                 self._campp_model = AutoModel(
                     model="iic/speech_eres2netv2_sv_zh-cn_16k-common",
+                    device=debug_device,
                     disable_update=True, log_level="WARNING",
                 )
 
@@ -238,6 +251,7 @@ class ASREngine:
                     model="iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
                     vad_model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
                     punc_model="iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+                    device=debug_device,
                     disable_update=True, log_level="WARNING",
                 )
 
