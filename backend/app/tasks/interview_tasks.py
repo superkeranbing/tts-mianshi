@@ -3,9 +3,11 @@
 import json
 import logging
 import asyncio
+import os
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
+from app.core.storage import storage
 from app.models.interview import InterviewReport, QAPair, KnowledgePoint
 from app.models.recording import Recording
 from app.models.transcript import Transcript
@@ -47,17 +49,25 @@ def analyze_interview_task(self, report_id: str):
                 if resume.raw_text and resume.raw_text.strip():
                     resume_text = resume.raw_text
                 elif resume.file_path:
+                    local_path = None
                     try:
+                        local_path = asyncio.run(storage.get_local_path(resume.file_path))
                         from app.services.resume_parser import resume_parser
                         if resume.file_type == "pdf":
-                            resume_text = asyncio.run(resume_parser._parse_pdf(resume.file_path))
+                            resume_text = asyncio.run(resume_parser._parse_pdf(local_path))
                         elif resume.file_type in ("doc", "docx"):
-                            resume_text = asyncio.run(resume_parser._parse_docx(resume.file_path))
+                            resume_text = asyncio.run(resume_parser._parse_docx(local_path))
                         if resume_text:
                             resume.raw_text = resume_text
                             db.commit()
                     except Exception as e:
                         logger.error(f"Resume text extraction failed: {e}")
+                    finally:
+                        if local_path and local_path != resume.file_path:
+                            try:
+                                os.remove(local_path)
+                            except Exception:
+                                pass
 
         from app.services.llm_service import llm_service
         analysis = asyncio.run(llm_service.analyze_interview(transcript_data, resume_text))

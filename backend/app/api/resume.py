@@ -48,9 +48,8 @@ async def delete_resume(resume_id: str, db: Session = Depends(get_db), user: dic
     ).scalar_one_or_none()
     if not r:
         raise HTTPException(404, "简历不存在")
-    # Delete file from disk
-    if r.file_path and os.path.exists(r.file_path):
-        os.remove(r.file_path)
+    if r.file_path:
+        await storage.delete_file(r.file_path)
     db.delete(r)
     db.commit()
     return {"ok": True}

@@ -50,6 +50,13 @@ services:
       DATABASE_URL: postgresql://dev:dev123@postgres:5432/tts_mianshi
       SYNC_DATABASE_URL: postgresql://dev:dev123@postgres:5432/tts_mianshi
       REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tts-mianshi
+      STORAGE_BACKEND: local
       CORS_ORIGINS: http://localhost:5173,http://localhost:8000,http://localhost:80
       DEBUG: "true"
     depends_on:
@@ -90,3 +97,5 @@ services:
 volumes:
   pgdata:
   miniodata:
+  uploads_data:
+  models_data:

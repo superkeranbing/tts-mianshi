@@ -37,10 +37,13 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "deepseek-chat"
     LLM_MAX_TOKENS: int = 4096
 
+    # Storage backend: local | minio
+    STORAGE_BACKEND: str = "local"
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:1420,http://localhost:8000"
 
-        # MinIO
+    # MinIO
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin"

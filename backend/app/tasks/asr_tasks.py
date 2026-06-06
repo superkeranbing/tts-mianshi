@@ -3,9 +3,11 @@
 import json
 import logging
 import asyncio
+import os
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
+from app.core.storage import storage
 from app.models.recording import Recording
 from app.models.transcript import Transcript
 
@@ -27,7 +29,15 @@ def transcribe_audio_task(self, recording_id: str):
         db.commit()
 
         from app.services.asr_engine import asr_engine
-        segments = asyncio.run(asr_engine.transcribe(recording.audio_path))
+        local_path = asyncio.run(storage.get_local_path(recording.audio_path))
+        try:
+            segments = asyncio.run(asr_engine.transcribe(local_path))
+        finally:
+            if local_path != recording.audio_path:
+                try:
+                    os.remove(local_path)
+                except Exception:
+                    pass
 
         recording.audio_duration = segments[-1].end_time if segments else 0
         recording.status = "completed"

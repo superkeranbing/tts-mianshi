@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import uuid, os, io, random
@@ -99,11 +99,14 @@ async def stream_audio(recording_id: str, token: str = None, db: Session = Depen
     ).scalar_one_or_none()
     if not recording:
         raise HTTPException(404, "录音不存在")
-    path = os.path.abspath(recording.audio_path)
-    if not os.path.exists(path):
-        raise HTTPException(404, "音频文件不存在于磁盘")
-    ext = path.rsplit(".", 1)[-1].lower() if "." in path else "wav"
-    return FileResponse(path, media_type=MIME_MAP.get(ext, "audio/wav"))
+    if not storage.exists(recording.audio_path):
+        raise HTTPException(404, "音频文件不存在")
+    ext = recording.audio_path.rsplit(".", 1)[-1].lower() if "." in recording.audio_path else "wav"
+    file_bytes = await storage.get_file(recording.audio_path)
+    return StreamingResponse(
+        io.BytesIO(file_bytes),
+        media_type=MIME_MAP.get(ext, "audio/wav"),
+    )
 
 
 @router.put("/transcripts/{transcript_id}")
@@ -149,8 +152,7 @@ async def delete_recording(recording_id: str, db: Session = Depends(get_db), use
     ).scalar_one_or_none()
     if not recording:
         raise HTTPException(404, "录音不存在")
-    if os.path.exists(recording.audio_path):
-        os.remove(recording.audio_path)
+    await storage.delete_file(recording.audio_path)
     db.delete(recording)
     db.commit()
     return {"ok": True}
