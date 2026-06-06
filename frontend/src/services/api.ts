@@ -91,10 +91,7 @@ export function listResumes() {
 export function uploadResume(file: File) {
   const fd = new FormData();
   fd.append("file", file);
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = "Bearer " + token;
-  return fetch(BASE + "/resumes/upload", { method: "POST", body: fd, headers }).then((r) => r.json());
+  return request<Resume>("/resumes/upload", { method: "POST", body: fd });
 }
 
 // Interview

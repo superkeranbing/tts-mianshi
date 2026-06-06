@@ -10,6 +10,7 @@ export default function InterviewPage() {
   const [selRec, setSelRec] = useState("");
   const [selRes, setSelRes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,8 +31,16 @@ export default function InterviewPage() {
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try { await uploadResume(file); setResumes(await listResumes()); } catch {}
-    e.target.value = "";
+    setUploadingResume(true);
+    try {
+      await uploadResume(file);
+      setResumes(await listResumes());
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "简历上传失败");
+    } finally {
+      setUploadingResume(false);
+      e.target.value = "";
+    }
   };
 
   return (
@@ -62,9 +71,10 @@ export default function InterviewPage() {
       <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
         <h3 className="font-semibold mb-3 text-emerald-400 flex items-center gap-2"><Upload className="w-4 h-4" /> 上传简历</h3>
         <p className="text-gray-500 text-sm mb-3">上传简历后，AI 将结合你的经历给出更个性化的分析。</p>
-        <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm cursor-pointer transition-colors">
-          📎 选择简历文件 (PDF/DOC/DOCX)
-          <input type="file" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} className="hidden" />
+        <label className={`inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm cursor-pointer transition-colors ${uploadingResume ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          {uploadingResume ? <Loader2 className="w-4 h-4 animate-spin" /> : '📎'}
+          {uploadingResume ? '上传中...' : '选择简历文件 (PDF/DOC/DOCX)'}
+          <input type="file" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} disabled={uploadingResume} className="hidden" />
         </label>
       </div>
     </div>

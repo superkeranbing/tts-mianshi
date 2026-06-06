@@ -10,21 +10,23 @@ settings = get_settings()
 class ResumeParser:
     """Parse PDF/DOCX resumes and extract structured information"""
 
-    async def parse(self, file_path: str, file_type: str) -> dict:
+    async def parse(self, file_path: str, file_type: str, raw_text: Optional[str] = None) -> dict:
         """
         Parse a resume file and return structured data.
         file_type: pdf, doc, docx
+        If raw_text is provided, skip file parsing and use it directly.
         """
-        raw_text = ""
-        try:
-            if file_type == "pdf":
-                raw_text = await self._parse_pdf(file_path)
-            elif file_type in ("doc", "docx"):
-                raw_text = await self._parse_docx(file_path)
-            else:
-                raw_text = await self._parse_fallback(file_path)
-        except Exception as e:
-            logger.error(f"Resume parsing error: {e}")
+        if raw_text is None:
+            try:
+                if file_type == "pdf":
+                    raw_text = await self._parse_pdf(file_path)
+                elif file_type in ("doc", "docx"):
+                    raw_text = await self._parse_docx(file_path)
+                else:
+                    raw_text = await self._parse_fallback(file_path)
+            except Exception as e:
+                logger.error(f"Resume parsing error: {e}")
+                raw_text = ""
 
         # Use LLM for structured extraction if available
         from app.services.llm_service import llm_service

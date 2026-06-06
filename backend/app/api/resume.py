@@ -17,9 +17,20 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     safe = f"{uuid.uuid4()}{ext}"
     content = await file.read()
     path = await storage.save_resume(content, safe)
-    file_type = ext.lstrip(".")
-    parsed = await resume_parser.parse(path, file_type)
-    raw_text = parsed.pop("raw_text", "") or await resume_parser._parse_fallback(path)
+    file_type = ext.lstrip(".").lower()
+    # Extract raw text from file first, then let LLM structure it
+    raw_text = ""
+    try:
+        if file_type == "pdf":
+            raw_text = await resume_parser._parse_pdf(path)
+        elif file_type in ("doc", "docx"):
+            raw_text = await resume_parser._parse_docx(path)
+        else:
+            raw_text = await resume_parser._parse_fallback(path)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to extract raw text from resume: {e}")
+    parsed = await resume_parser.parse(path, file_type, raw_text=raw_text)
     resume = Resume(
         user_id=user["id"], file_path=path, file_name=file.filename or "resume",
         file_type=file_type,
