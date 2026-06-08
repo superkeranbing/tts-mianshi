@@ -56,6 +56,8 @@ services:
     container_name: asr-backend
     ports:
       - "8000:8000"                          # Must be exposed for frontend server
+    env_file:
+      - ../backend/.env
     environment:
       DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
       SYNC_DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
@@ -66,6 +68,7 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: asr-mianshi
+      STORAGE_BACKEND: minio
       CORS_ORIGINS: http://FRONTEND_SERVER_IP,http://FRONTEND_SERVER_DOMAIN
       JWT_SECRET: change-me-use-openssl-rand-hex-32
       DEBUG: "false"
@@ -94,6 +97,8 @@ services:
     container_name: asr-celery-worker
     command: celery -A celery_worker worker -l info --without-gossip --without-mingle --without-heartbeat
     gpus: all
+    env_file:
+      - ../backend/.env
     environment:
       DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
       SYNC_DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
@@ -104,6 +109,7 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: asr-mianshi
+      STORAGE_BACKEND: minio
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
@@ -122,12 +128,19 @@ services:
     build: ../backend
     container_name: asr-celery-beat
     command: celery -A celery_worker beat -l info
+    env_file:
+      - ../backend/.env
     environment:
       DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
       SYNC_DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: asr-mianshi
+      STORAGE_BACKEND: minio
     depends_on:
       postgres:
         condition: service_healthy

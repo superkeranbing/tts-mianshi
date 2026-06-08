@@ -46,6 +46,8 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    env_file:
+      - ../backend/.env
     environment:
       DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
       SYNC_DATABASE_URL: postgresql://dev:dev123@postgres:5432/asr_mianshi
