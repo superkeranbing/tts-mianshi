@@ -1,6 +1,12 @@
-﻿from pydantic_settings import BaseSettings
-from functools import lru_cache
 import os
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(APP_DIR)
+ENV_FILE = os.path.join(BACKEND_DIR, ".env")
+
 
 class Settings(BaseSettings):
     APP_NAME: str = "听记面试 ASR-Mianshi"
@@ -17,10 +23,10 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 1440
 
     # File storage (local filesystem instead of MinIO)
-    UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
-    AUDIO_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "audio")
-    RESUME_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "resumes")
-    EXPORT_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "exports")
+    UPLOAD_DIR: str = os.path.join(BACKEND_DIR, "uploads")
+    AUDIO_DIR: str = os.path.join(BACKEND_DIR, "uploads", "audio")
+    RESUME_DIR: str = os.path.join(BACKEND_DIR, "uploads", "resumes")
+    EXPORT_DIR: str = os.path.join(BACKEND_DIR, "uploads", "exports")
 
     # Redis / Celery
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -50,10 +56,10 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "asr-mianshi"
 
     class Config:
-        env_file = ".env"
+        env_file = ENV_FILE
         env_file_encoding = "utf-8"
+
 
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
-

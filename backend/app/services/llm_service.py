@@ -122,6 +122,7 @@ class LLMService:
 
     async def summarize_conversation(self, transcripts: list[dict]) -> dict:
         """Generate a concise summary from conversation transcripts"""
+        logger.info(f"Summarizing conversation with {len(transcripts)} segments")
         lines = []
         for t in transcripts:
             sp = t.get("speaker_name") or t.get("speaker", "未知")
@@ -138,12 +139,13 @@ class LLMService:
 
     async def extract_qa_pairs(self, transcripts: list[dict]) -> dict:
         """Extract Q&A pairs from conversation transcripts"""
+        logger.info(f"Extracting QA pairs from {len(transcripts)} segments")
         lines = []
         for t in transcripts:
             sp = t.get("speaker_name") or t.get("speaker", "未知")
             lines.append(f"{sp}: {t.get('content', '')}")
         transcript_text = "\n".join(lines)
-        prompt = f"从以下面试对话中提取问答对，只保留面试官提问-候选人回答的配对：\n{transcript_text}"
+        prompt = f"从以下面试对话中提取问答对，只保留面试官提问-候选人回答的配对：\n{transcript_text}（注意：需要过滤掉无意义的问答对，只保留有意义的问答对）"
         system = f"你是一个面试对话分析助手。提取问答对并输出JSON格式。例如：\n{_MOCK_CONVERSATION_QA}"
         if self._is_configured():
             try:
